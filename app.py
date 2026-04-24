@@ -16,7 +16,7 @@ MY_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 if not MY_API_KEY:
     try:
-        MY_API_KEY = st.secrets["GEMINI_API_KEY"]
+        MY_API_KEY = st.secrets["AIzaSyBSJnT-d-auUqkMMXN8sxuRDEoaWS5UinY"]
     except:
         st.error("⚠️ يرجى إعداد مفتاح API الخاص بـ Gemini في متغيرات البيئة.")
         st.stop()
