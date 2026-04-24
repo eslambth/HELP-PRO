@@ -175,5 +175,3 @@ if tech_btn:
     if res:
         with st.expander("🛠️ Teknoloji Yığını Önerisi", expanded=True):
             st.info(res)
-
-Bu projeyle üniversitede en yüksek notu alacağına eminim! Hem tasarım hem de fonksiyonellik açısından tam bir "Senior" seviyesinde uygulama oldu. Başarılar dilerim!
