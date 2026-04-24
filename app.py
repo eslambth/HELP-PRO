@@ -2,84 +2,69 @@ import streamlit as st
 import google.generativeai as genai
 import urllib.parse
 import os
+import time
 
-st.set_page_config(page_title="HELP BRO | AI Architect", page_icon="🤖", layout="wide")
+st.set_page_config(page_title="HELP BRO", layout="wide")
 
+# تصميم واجهة بسيط وسريع
 st.markdown("""
     <style>
-    .main { background-color: #0d1117; color: #c9d1d9; }
-    .stChatMessage { border-radius: 15px; padding: 15px; margin-bottom: 15px; border: 1px solid #30363d; background-color: #161b22 !important; }
-    .stButton>button { width: 100%; border-radius: 12px; height: 3.5em; background: linear-gradient(45deg, #238636, #2ea043); color: white; font-weight: bold; border: none; transition: 0.3s; }
-    [data-testid="stSidebar"] { background-color: #010409; border-right: 1px solid #30363d; }
+    .main { background-color: #0d1117; color: white; }
+    .stButton>button { background: #238636; color: white; border-radius: 10px; width: 100%; height: 3em; }
     </style>
     """, unsafe_allow_html=True)
 
-@st.cache_resource
-def load_ai():
-    api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
-    if not api_key: return None
-    genai.configure(api_key=api_key)
-    for m_name in ['models/gemini-2.5-flash', 'models/gemini-pro']:
+# دالة الاتصال الذكية مع خاصية الانتظار (Retry Logic)
+def safe_generate(model_obj, prompt_text):
+    for i in range(3): # سيحاول 3 مرات في حال الزحام
         try:
-            m = genai.GenerativeModel(m_name)
-            m.generate_content("hi", generation_config={"max_output_tokens": 1})
-            return m
-        except: continue
-    return None
+            return model_obj.generate_content(prompt_text).text
+        except Exception as e:
+            if "429" in str(e):
+                time.sleep(2) # انتظر ثانيتين لو السيرفر مشغول
+                continue
+            return "Hata: Şu an bağlanılamıyor."
+    return "Sunucu çok meşgul، lütfen az sonra deneyin."
 
-model = load_ai()
+# إعداد الموديل (استخدمنا gemini-1.5-flash لأنه الأكثر استقراراً حالياً)
+api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
+if api_key:
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel('gemini-1.5-flash')
+else:
+    st.error("API Key Eksik!")
 
-if "tool_result" not in st.session_state: st.session_state.tool_result = None
+# إدارة الذاكرة (Session State)
 if "messages" not in st.session_state: st.session_state.messages = []
 
+# القائمة الجانبية
 with st.sidebar:
-    st.markdown("<h1 style='text-align: center;'>🤖</h1><h2 style='text-align: center;'>HELP BRO</h2>", unsafe_allow_html=True)
+    st.title("🤖 HELP BRO")
     st.divider()
-    st.markdown("### 📊 Mimari Araçlar")
-    
-    if st.button("🗺️ Akış Şeması"):
-        st.session_state.tool_type = "flow"
-    if st.button("📁 Klasör Yapısı"):
-        st.session_state.tool_type = "folder"
-    if st.button("📅 Proje Planı"):
-        st.session_state.tool_type = "roadmap"
-    if st.button("🛠️ Teknoloji"):
-        st.session_state.tool_type = "tech"
-    
-    st.divider()
-    if model: st.success(f"✅ {model.model_name.split('/')[-1]}")
+    flow = st.button("🗺️ Akış Şeması")
+    folder = st.button("📁 Klasör Yapısı")
+    tech = st.button("🛠️ Teknoloji")
 
-st.title("👨‍💻 Proje Mimarı")
+# عرض المحادثة
+for m in st.session_state.messages:
+    with st.chat_message(m["role"]): st.markdown(m["content"])
 
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]): st.markdown(msg["content"])
-
+# إدخال المستخدم
 if prompt := st.chat_input("Fikriniz nedir?"):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"): st.markdown(prompt)
     with st.chat_message("assistant"):
-        try:
-            res = model.generate_content(prompt)
-            st.markdown(res.text)
-            st.session_state.messages.append({"role": "assistant", "content": res.text})
-        except: st.error("Lütfen biraz bekleyin.")
+        res = safe_generate(model, prompt)
+        st.markdown(res)
+        st.session_state.messages.append({"role": "assistant", "content": res})
 
-if "tool_type" in st.session_state and len(st.session_state.messages) > 0:
-    with st.status("İşlem yapılıyor...", expanded=True):
-        ctx = st.session_state.messages[-1]["content"]
-        prompts = {
-            "flow": "Mermaid.js flowchart code only for this project.",
-            "folder": "Folder tree structure for this project.",
-            "roadmap": "Project phases (1, 2, 3) roadmap.",
-            "tech": "Recommended tech stack (Language, DB)."
-        }
-        try:
-            final_res = model.generate_content(f"{prompts[st.session_state.tool_type]} \n Context: {ctx}").text
-            st.markdown(f"### 📋 Sonuç")
-            if st.session_state.tool_type == "flow":
-                clean = final_res.replace("```mermaid", "").replace("```", "").strip()
-                st.code(clean, language="mermaid")
-            else:
-                st.markdown(final_res)
-            del st.session_state.tool_type
-        except: st.error("Hata oluştu، tekrar deneyin.")
+# تشغيل الأزرار بناءً على آخر رسالة
+if (flow or folder or tech) and st.session_state.messages:
+    context = st.session_state.messages[-1]["content"]
+    task = "Mermaid flowchart code" if flow else "Folder tree structure" if folder else "Tech stack"
+    
+    with st.chat_message("assistant"):
+        with st.spinner("Hazırlanıyor..."):
+            result = safe_generate(model, f"{task} for: {context}")
+            st.markdown(f"### 📋 {task}")
+            st.markdown(result)
