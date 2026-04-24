@@ -1,9 +1,3 @@
-for m in genai.list_models():
-    if 'generateContent' in m.supported_generation_methods:
-        print(m.name)
-
-
-
 
 
 
@@ -13,6 +7,17 @@ import google.generativeai as genai
 import urllib.parse
 import os
 from dotenv import load_dotenv
+
+
+
+
+
+for m in genai.list_models():
+    if 'generateContent' in m.supported_generation_methods:
+        print(m.name)
+
+
+
 
 # تحميل المتغيرات محلياً فقط
 load_dotenv()
