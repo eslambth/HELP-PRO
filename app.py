@@ -1,69 +1,70 @@
 import streamlit as st
 import google.generativeai as genai
 import os
-import time
 
 st.set_page_config(page_title="HELP BRO", layout="wide")
 
-# إعداد الـ API بطريقة تمنع الأخطاء القديمة
-api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
+st.markdown("""
+    <style>
+    .main { background-color: #0d1117; color: white; }
+    .stButton>button { background: #238636; color: white; border-radius: 10px; width: 100%; }
+    </style>
+    """, unsafe_allow_html=True)
 
+api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 if not api_key:
-    st.error("API Key missing!")
+    st.error("API Key Missing!")
     st.stop()
 
 genai.configure(api_key=api_key)
 
-# اختيار الموديل الأكثر استقراراً للنسخة المجانية
-model = genai.GenerativeModel('gemini-1.5-flash')
+@st.cache_resource
+def get_model():
+    # سيجرب الكود كل الصيغ الممكنة لاسم الموديل ليتخطى خطأ 404
+    names_to_test = ["gemini-1.5-flash", "gemini-pro", "models/gemini-1.5-flash"]
+    for name in names_to_test:
+        try:
+            m = genai.GenerativeModel(name)
+            m.generate_content("hi", generation_config={"max_output_tokens": 1})
+            return m
+        except:
+            continue
+    return None
 
-# الحالة الذاكرية للتطبيق
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+model = get_model()
 
-# التصميم الجانبي
+if "history" not in st.session_state:
+    st.session_state.history = []
+
 with st.sidebar:
     st.title("🤖 HELP BRO")
     st.divider()
     btn_flow = st.button("🗺️ Akış Şeması")
     btn_tech = st.button("🛠️ Teknoloji")
-    if st.button("🗑️ Sohbeti Temizle"):
-        st.session_state.chat_history = []
+    if st.button("🗑️ Temizle"):
+        st.session_state.history = []
         st.rerun()
 
-# عرض الرسائل
-for role, text in st.session_state.chat_history:
-    with st.chat_message(role):
-        st.markdown(text)
+for role, text in st.session_state.history:
+    with st.chat_message(role): st.markdown(text)
 
-# دالة ذكية للإرسال تمنع التعليق
-def ask_ai(query):
-    try:
-        response = model.generate_content(query)
-        return response.text
-    except Exception as e:
-        if "429" in str(e):
-            return "⚠️ Suncucu meşgul (Quota Full). Lütfen 30 saniye bekleyin."
-        return f"⚠️ Hata oluştu: {str(e)[:50]}"
-
-# المحادثة الأساسية
 if prompt := st.chat_input("Fikriniz nedir?"):
-    st.session_state.chat_history.append(("user", prompt))
-    with st.chat_message("user"):
-        st.markdown(prompt)
-    
+    st.session_state.history.append(("user", prompt))
+    with st.chat_message("user"): st.markdown(prompt)
     with st.chat_message("assistant"):
-        answer = ask_ai(prompt)
-        st.markdown(answer)
-        st.session_state.chat_history.append(("assistant", answer))
+        try:
+            res = model.generate_content(prompt).text
+            st.markdown(res)
+            st.session_state.history.append(("assistant", res))
+        except Exception as e:
+            st.error("Sistem meşgul، lütfen 10 saniye bekleyin.")
 
-# تشغيل الأزرار
-if (btn_flow or btn_tech) and st.session_state.chat_history:
-    last_msg = st.session_state.chat_history[-1][1]
-    query_type = "Mermaid flowchart code" if btn_flow else "Best technology stack"
-    
+if (btn_flow or btn_tech) and st.session_state.history:
+    last_context = st.session_state.history[-1][1]
+    q = "Mermaid flowchart code" if btn_flow else "Technology stack"
     with st.chat_message("assistant"):
-        with st.spinner("Düşünüyor..."):
-            extra_res = ask_ai(f"{query_type} for this: {last_msg}")
-            st.info(f"### 📊 {query_type}")
-            st.markdown(extra_res)
+        try:
+            result = model.generate_content(f"{q} for: {last_context}").text
+            st.info(result)
+        except:
+            st.warning("Hata! Lütfen biraz bekleyip tekrar basın.")
