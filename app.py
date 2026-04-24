@@ -12,11 +12,11 @@ load_dotenv()
 st.set_page_config(page_title="HELP BRO", page_icon="🤖", layout="wide")
 
 # جلب المفتاح بأمان من متغيرات البيئة (أو st.secrets الخاص بـ Streamlit)
-MY_API_KEY = os.environ.get("GEMINI_API_KEY")
+MY_API_KEY = os.environ.get("AIzaSyBSJnT-d-auUqkMMXN8sxuRDEoaWS5UinY")
 
 if not MY_API_KEY:
     try:
-        MY_API_KEY = st.secrets["AIzaSyBSJnT-d-auUqkMMXN8sxuRDEoaWS5UinY"]
+        MY_API_KEY = st.secrets["GEMINI_API_KEY"]
     except:
         st.error("⚠️ يرجى إعداد مفتاح API الخاص بـ Gemini في متغيرات البيئة.")
         st.stop()
