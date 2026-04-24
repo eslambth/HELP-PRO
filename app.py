@@ -33,7 +33,7 @@ try:
         
     genai.configure(api_key=api_key)
     # استخدام المسار الكامل للموديل لتجنب خطأ 404
-    model = genai.GenerativeModel('models/gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-pro')
 except Exception as e:
     st.error(f"خطأ في الإعداد: {e}")
     st.stop()
