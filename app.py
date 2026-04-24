@@ -1,105 +1,77 @@
-Skip to content
-eslambth
-HELP-PRO
-Repository navigation
-Code
-Issues
-Pull requests
-Actions
-Projects
-Wiki
-Security and quality
-Insights
-Settings
-HELP-PRO
-/
-app.py
-in
-main
-
-Edit
-
-Preview
-Indent mode
-
-Spaces
-Indent size
-
-4
-Line wrap mode
-
-No wrap
-Editing app.py file contents
-  1
-  2
-  3
-  4
-  5
-  6
-  7
-  8
-  9
- 10
- 11
- 12
- 13
- 14
- 15
- 16
- 17
- 18
- 19
- 20
- 21
- 22
- 23
- 24
- 25
- 26
- 27
- 28
- 29
- 30
- 31
- 32
- 33
- 34
- 35
- 36
 import streamlit as st
 import google.generativeai as genai
 import os
+import time
 
-st.set_page_config(page_title="HELP BRO", layout="wide")
+st.set_page_config(page_title="HELP BRO | Proje Mimarı", layout="wide")
 
-st.markdown("""
-    <style>
-    .main { background-color: #0d1117; color: white; }
-    .stButton>button { background: #238636; color: white; border-radius: 10px; width: 100%; }
-    </style>
-    """, unsafe_allow_html=True)
-
+# إعداد الـ API
 api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
-if not api_key:
-    st.error("API Key Missing!")
+if api_key:
+    genai.configure(api_key=api_key)
+else:
+    st.error("API Key Eksik!")
     st.stop()
 
-genai.configure(api_key=api_key)
-
+# دالة لاختيار الموديل بناءً على ما نجح في صور الفحص السابقة
 @st.cache_resource
-def get_model():
-    # سيجرب الكود كل الصيغ الممكنة لاسم الموديل ليتخطى خطأ 404
-    names_to_test = ["gemini-1.5-flash", "gemini-pro", "models/gemini-1.5-flash"]
-    for name in names_to_test:
+def load_working_model():
+    # ترتيب الموديلات التي ظهرت باللون الأخضر في لقطة شاشتك
+    test_list = ["gemini-1.5-flash", "gemini-2.5-flash", "gemini-pro"]
+    for name in test_list:
         try:
             m = genai.GenerativeModel(name)
+            # تجربة صامتة
             m.generate_content("hi", generation_config={"max_output_tokens": 1})
             return m
         except:
             continue
     return None
 
-model = get_model()
+model = load_working_model()
 
 if "history" not in st.session_state:
-Use Control + Shift + m to toggle the tab key moving focus. Alternatively, use esc then tab to move to the next interactive element on the page.
+    st.session_state.history = []
+
+# اللوحة الجانبية
+with st.sidebar:
+    st.title("🤖 HELP BRO")
+    st.divider()
+    btn_flow = st.button("🗺️ Akış Şeması")
+    btn_tech = st.button("🛠️ Teknoloji")
+    if st.button("🗑️ Sohbeti Temizle"):
+        st.session_state.history = []
+        st.rerun()
+
+# عرض الشات
+for role, text in st.session_state.history:
+    with st.chat_message(role): st.markdown(text)
+
+# منطق الإرسال مع معالجة خطأ الزحام (Quota)
+if prompt := st.chat_input("Fikriniz nedir?"):
+    st.session_state.history.append(("user", prompt))
+    with st.chat_message("user"): st.markdown(prompt)
+    
+    with st.chat_message("assistant"):
+        try:
+            # محاولة الإرسال
+            response = model.generate_content(prompt)
+            st.markdown(response.text)
+            st.session_state.history.append(("assistant", response.text))
+        except Exception as e:
+            if "429" in str(e):
+                st.warning("⚠️ Google kotası doldu. Lütfen 1 dakika bekleyip sayfayı yenileyin.")
+            else:
+                st.error(f"⚠️ Bağlantı hatası: {str(e)[:100]}")
+
+# تشغيل الأزرار
+if (btn_flow or btn_tech) and st.session_state.history:
+    context = st.session_state.history[-1][1]
+    task = "Mermaid.js flowchart code" if btn_flow else "Tech stack recommendations"
+    with st.chat_message("assistant"):
+        with st.spinner("İşleniyor..."):
+            try:
+                res = model.generate_content(f"{task} for this: {context}")
+                st.info(res.text)
+            except:
+                st.error("Şu an yanıt alınamıyor، lütfen az sonra tekrar basın.")
