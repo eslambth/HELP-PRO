@@ -1,33 +1,48 @@
 import streamlit as st
 import google.generativeai as genai
-import urllib.parse
 import os
 
-st.set_page_config(page_title="HELP BRO", layout="wide")
+st.set_page_config(page_title="Model Scanner", page_icon="🔍")
+
+st.title("🔍 Gemini Model Scanner")
+
+api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
+
+if not api_key:
+    st.error("API Key missing in Secrets!")
+    st.stop()
 
 try:
-    api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
     genai.configure(api_key=api_key)
-    # جرب استخدام gemini-pro فهو الأضمن للعمل مع المفاتيح الجديدة
-    model = genai.GenerativeModel('gemini-pro') 
+    
+    st.write("جاري البحث عن الموديلات المتاحة لمفتاحك...")
+    
+    available_models = []
+    for m in genai.list_models():
+        if 'generateContent' in m.supported_generation_methods:
+            available_models.append(m.name)
+    
+    if available_models:
+        st.success(f"تم العثور على {len(available_models)} موديل مدعوم:")
+        
+        for name in available_models:
+            st.code(name)
+            
+        st.divider()
+        
+        selected = st.selectbox("اختبر موديل الآن:", available_models)
+        test_text = st.text_input("رسالة تجريبية:", "Merhaba")
+        
+        if st.button("تشغيل الاختبار"):
+            try:
+                test_model = genai.GenerativeModel(selected)
+                response = test_model.generate_content(test_text)
+                st.write("✅ الموديل يعمل! الرد:")
+                st.success(response.text)
+            except Exception as e:
+                st.error(f"❌ فشل الموديل {selected}: {e}")
+    else:
+        st.warning("لم يتم العثور على موديلات تدعم توليد المحتوى.")
+
 except Exception as e:
-    st.error(f"API Error: {e}")
-
-st.title("👨‍💻 Proje Planlama Merkezi")
-
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-for m in st.session_state.messages:
-    with st.chat_message(m["role"]): st.markdown(m["content"])
-
-if p := st.chat_input("Fikriniz nedir?"):
-    st.session_state.messages.append({"role": "user", "content": p})
-    with st.chat_message("user"): st.markdown(p)
-    with st.chat_message("assistant"):
-        try:
-            r = model.generate_content(p)
-            st.markdown(r.text)
-            st.session_state.messages.append({"role": "assistant", "content": r.text})
-        except Exception as e:
-            st.error(f"Model Error: {e}")
+    st.error(f"خطأ في الاتصال بالـ API: {e}")
