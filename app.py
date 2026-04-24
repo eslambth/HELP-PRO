@@ -19,7 +19,7 @@ if not MY_API_KEY:
 genai.configure(api_key=MY_API_KEY)
 
 # تم تصحيح اسم الموديل هنا
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('models/gemini-1.5-flash')
 
 st.title("🤖 HELP BRO")
 st.markdown("### مساعدك الذكي لتخطيط المشاريع البرمجية")
